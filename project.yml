@@ -1,0 +1,27 @@
+# XcodeGen spec - run: xcodegen generate (install with: brew install xcodegen)
+name: BreakLockUtility
+options:
+  bundleIdPrefix: com.breaklock
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+packages: {}
+targets:
+  BreakLockUtility:
+    type: application
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: Sources/BreakLockUtility
+        name: BreakLockUtility
+    settings:
+      base:
+        INFOPLIST_FILE: BreakLockUtility/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        PRODUCT_BUNDLE_IDENTIFIER: com.breaklock.utility
+        LD_RUNPATH_SEARCH_PATHS: ["$(inherited)", "@executable_path/../Frameworks"]
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        COMBINE_HIDPI_IMAGES: YES
+        ENABLE_PREVIEWS: YES
