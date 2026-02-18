@@ -4,8 +4,7 @@ import AppKit
 struct MenuContentView: View {
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var scheduler: BreakScheduler
-
-    @State private var showSettings = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -23,13 +22,6 @@ struct MenuContentView: View {
         }
         .padding(.vertical, 6)
         .frame(minWidth: 260)
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-                .environmentObject(settings)
-                .environmentObject(scheduler)
-                .frame(width: 360, height: 260)
-                .padding()
-        }
     }
 
     private var statusSection: some View {
@@ -70,68 +62,16 @@ struct MenuContentView: View {
 
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button("Settings…") { showSettings = true }
-                .buttonStyle(.borderless)
+            Button("Settings…") {
+                openWindow(id: "Settings")
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            .buttonStyle(.borderless)
 
             Text("Interval: \(settings.breakIntervalMinutes) min • Break: \(settings.breakDurationMinutes) min • Reminder: \(settings.reminderMinutesBefore) min")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
-        }
-    }
-}
-
-private struct SettingsView: View {
-    @EnvironmentObject private var settings: SettingsStore
-    @EnvironmentObject private var scheduler: BreakScheduler
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Settings")
-                .font(.title3)
-
-            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
-                GridRow {
-                    Text("Break interval")
-                    Stepper(value: $settings.breakIntervalMinutes, in: 1...480) {
-                        Text("\(settings.breakIntervalMinutes) minutes")
-                    }
-                }
-
-                GridRow {
-                    Text("Break duration")
-                    Stepper(value: $settings.breakDurationMinutes, in: 1...60) {
-                        Text("\(settings.breakDurationMinutes) minutes")
-                    }
-                }
-
-                GridRow {
-                    Text("Reminder before lock")
-                    Stepper(value: $settings.reminderMinutesBefore, in: 0...30) {
-                        Text("\(settings.reminderMinutesBefore) minutes")
-                    }
-                }
-
-                GridRow {
-                    Text("Turn off display when locking")
-                    Toggle("", isOn: $settings.displaySleepWhenLocking)
-                        .labelsHidden()
-                }
-            }
-
-            Text("Unlock anytime with your password. The next work interval starts when you unlock. Break duration is advisory (used in messages only).")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text("Changing settings affects the next scheduled interval. To apply immediately, Pause then Start/Resume.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            HStack {
-                Spacer()
-                Button("Close") { NSApp.keyWindow?.close() }
-                    .keyboardShortcut(.defaultAction)
-            }
         }
     }
 }

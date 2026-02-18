@@ -22,6 +22,13 @@ struct BreakLockUtilityApp: App {
                 }
         }
         .menuBarExtraStyle(.menu)
+
+        Window("Settings", id: "Settings") {
+            AppSettingsView()
+                .environmentObject(settings)
+                .environmentObject(scheduler)
+        }
+        .windowResizability(.contentSize)
     }
 }
 

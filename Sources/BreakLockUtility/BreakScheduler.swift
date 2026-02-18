@@ -45,6 +45,17 @@ final class BreakScheduler: ObservableObject {
             }
         }
     }
+    
+    func applySettingsChanged() {
+        guard let settings else { return }
+        guard state == .running else { return }
+        // If we're awaiting unlock, do nothing; next interval will be scheduled on unlock.
+        if awaitingUnlock {
+            return
+        }
+        cancelScheduledWork()
+        scheduleNewInterval(from: Date(), settings: settings)
+    }
 
     deinit {
         if let token = unlockObserver {
@@ -97,7 +108,9 @@ final class BreakScheduler: ObservableObject {
         cancelScheduledWork()
 
         let interval = settings.breakInterval
-        let reminderLead = min(settings.reminderLead, max(0, interval - 1))
+        // Reminder is user-controlled but may not exceed 1 minute less than the interval.
+        let maxLead = max(0, interval - 60)
+        let reminderLead = min(settings.reminderLead, maxLead)
 
         let lockAt = start.addingTimeInterval(interval)
         nextLockAt = lockAt
