@@ -4,7 +4,6 @@ import AppKit
 struct MenuContentView: View {
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var scheduler: BreakScheduler
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -63,8 +62,7 @@ struct MenuContentView: View {
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button("Settings…") {
-                openWindow(id: "Settings")
-                NSApp.activate(ignoringOtherApps: true)
+                SettingsWindowController.shared.open(settings: settings, scheduler: scheduler)
             }
             .buttonStyle(.borderless)
 

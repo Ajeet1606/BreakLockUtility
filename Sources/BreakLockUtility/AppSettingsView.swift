@@ -1,9 +1,9 @@
 import SwiftUI
+import AppKit
 
 struct AppSettingsView: View {
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var scheduler: BreakScheduler
-    @Environment(\.dismiss) private var dismiss
 
     // Editable copies (so Cancel discards changes)
     @State private var intervalMinutes: Int = 0
@@ -55,7 +55,7 @@ struct AppSettingsView: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
+                Button("Cancel") { closeWindow() }
                 Button("Save") { saveAndApply() }
                     .keyboardShortcut(.defaultAction)
             }
@@ -84,7 +84,49 @@ struct AppSettingsView: View {
         settings.reminderMinutesBefore = reminderBeforeMinutes
         settings.displaySleepWhenLocking = displaySleep
         scheduler.applySettingsChanged()
-        dismiss()
+        closeWindow()
+    }
+
+    private func closeWindow() {
+        NSApp.keyWindow?.close()
+    }
+}
+
+// MARK: - Settings Window Controller
+
+/// Opens an NSWindow hosting AppSettingsView.
+/// Used because `openWindow(id:)` does not work from `.menuBarExtraStyle(.menu)` context.
+@MainActor
+final class SettingsWindowController {
+    static let shared = SettingsWindowController()
+    private var window: NSWindow?
+
+    func open(settings: SettingsStore, scheduler: BreakScheduler) {
+        // If the window already exists and is visible, just bring it forward.
+        if let existing = window, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let view = AppSettingsView()
+            .environmentObject(settings)
+            .environmentObject(scheduler)
+
+        let hostingView = NSHostingView(rootView: view)
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 320),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        w.title = "Break Lock Settings"
+        w.contentView = hostingView
+        w.center()
+        w.isReleasedWhenClosed = false
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        self.window = w
     }
 }
 

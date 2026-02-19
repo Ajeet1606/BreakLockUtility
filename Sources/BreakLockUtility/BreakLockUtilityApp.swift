@@ -8,8 +8,11 @@ struct BreakLockUtilityApp: App {
 
     init() {
         // Prevent Dock icon + app switcher presence (menu-bar style utility).
-        // This avoids needing LSUIElement in Info.plist.
         NSApplication.shared.setActivationPolicy(.accessory)
+
+        // Request notification permission immediately at launch,
+        // so the delegate is installed before any notification is posted.
+        Task { await Notifier.ensureAuthorized() }
     }
 
     var body: some Scene {
@@ -22,13 +25,6 @@ struct BreakLockUtilityApp: App {
                 }
         }
         .menuBarExtraStyle(.menu)
-
-        Window("Settings", id: "Settings") {
-            AppSettingsView()
-                .environmentObject(settings)
-                .environmentObject(scheduler)
-        }
-        .windowResizability(.contentSize)
     }
 }
 

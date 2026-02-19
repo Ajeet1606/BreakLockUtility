@@ -15,56 +15,65 @@ private final class NotificationDelegate: NSObject, UNUserNotificationCenterDele
 private let notificationDelegate = NotificationDelegate()
 
 enum Notifier {
-    /// Skip notification setup when not running as an app bundle (e.g. SwiftPM executable),
-    /// to avoid "bundleProxyForCurrentProcess is nil" from UserNotifications.
     private static var hasValidBundle: Bool {
-        // Prefer reliable bundle checks over process arguments.
         let path = Bundle.main.bundlePath
         if path.hasSuffix(".app") { return true }
-        // Fallback: if we have a bundle identifier, we're likely running from an app bundle.
         if Bundle.main.bundleIdentifier != nil { return true }
         return false
     }
 
+    /// Call once at app launch to request permission and install the delegate.
     static func ensureAuthorized() async {
-        print("ensureAuthorized invoked, hasValidBundle =", hasValidBundle)
-        let bundle = Bundle.main
-        print("Bundle path:", bundle.bundlePath)
-        print("Bundle identifier:", bundle.bundleIdentifier as Any)
-        print("Executable URL:", bundle.executableURL?.path as Any)
-        print("Process args first:", ProcessInfo.processInfo.arguments.first ?? "nil")
-        guard hasValidBundle else { return }
-        print("ensureAuthorized called")
+        guard hasValidBundle else {
+            print("[Notifier] Skipping — no valid .app bundle")
+            return
+        }
         let center = UNUserNotificationCenter.current()
         center.delegate = notificationDelegate
+
         let settings = await center.notificationSettings()
+        print("[Notifier] authorization status:", settings.authorizationStatus.rawValue)
         switch settings.authorizationStatus {
-        case .authorized, .provisional, .ephemeral:
-            return
-        case .denied:
-            return
         case .notDetermined:
-            _ = try? await center.requestAuthorization(options: [.alert, .sound])
+            do {
+                let granted = try await center.requestAuthorization(options: [.alert, .sound])
+                print("[Notifier] Permission granted:", granted)
+            } catch {
+                print("[Notifier] Permission request error:", error)
+            }
+        case .denied:
+            print("[Notifier] Notifications denied by user. Enable in System Settings > Notifications.")
+        case .authorized, .provisional, .ephemeral:
+            break
         @unknown default:
-            return
+            break
         }
     }
 
     static func postNow(title: String, body: String) {
         guard hasValidBundle else { return }
         let center = UNUserNotificationCenter.current()
+
+        // Always ensure the delegate is set so banners show while the app is active.
+        center.delegate = notificationDelegate
+
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
-        print("postNow called, hasValidBundle =", hasValidBundle, "title:", title)
 
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
             trigger: nil
         )
-        center.add(request, withCompletionHandler: nil)
+        center.add(request) { error in
+            if let error {
+                print("[Notifier] Failed to post notification:", error)
+            } else {
+                print("[Notifier] Notification posted:", title)
+            }
+        }
     }
 }
 
