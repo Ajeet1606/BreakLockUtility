@@ -13,10 +13,10 @@ struct MenuContentView: View {
             Divider()
             controlsSection
             Divider()
-            Button("Send Test Notification") {
-                Notifier.postNow(title: "Test", body: "Hello from BreakLockUtility")
-            }
-            Divider()
+            // Button("Send Test Notification") {
+            //     Notifier.postNow(title: "Test", body: "Hello from BreakLockUtility")
+            // }
+            // Divider()
             Button("Quit") { scheduler.quit() }
         }
         .padding(.vertical, 6)
