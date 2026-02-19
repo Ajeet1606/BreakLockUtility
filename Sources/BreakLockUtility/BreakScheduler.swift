@@ -112,7 +112,12 @@ final class BreakScheduler: ObservableObject {
         let maxLead = max(0, interval - 60)
         let reminderLead = min(settings.reminderLead, maxLead)
 
-        let lockAt = start.addingTimeInterval(interval)
+        // Round start time down to the current minute boundary so the timer
+        // aligns to whole minutes (e.g. starting at 7:44:37 counts from 7:44:00).
+        let calendar = Calendar.current
+        let roundedStart = calendar.dateInterval(of: .minute, for: start)?.start ?? start
+
+        let lockAt = roundedStart.addingTimeInterval(interval)
         nextLockAt = lockAt
 
         if reminderLead > 0 {
@@ -161,17 +166,9 @@ final class BreakScheduler: ObservableObject {
                 return
             }
 
-            // Notify user on lock screen: they can unlock anytime; show suggested break time.
-            let breakMins = max(1, Int(round(breakDuration / 60)))
-            let breakMsg = breakMins == 1
-                ? "Unlock anytime with your password. Suggested break: 1 minute."
-                : "Unlock anytime with your password. Suggested break: \(breakMins) minutes."
-            Notifier.postNow(title: "Break started", body: breakMsg)
-
             // Lock now (and optionally turn off display).
             ScreenLocker.lockNow(displaySleep: settings.displaySleepWhenLocking)
 
-            // Option A: Do not schedule the next interval based on break duration.
             // Wait for screen unlock to restart from the unlock time.
             self.awaitingUnlock = true
             self.nextLockAt = nil
