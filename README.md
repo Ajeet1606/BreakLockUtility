@@ -1,49 +1,118 @@
-# BreakLockUtility (macOS menu bar app)
+# Break Lock (macOS menu bar app)
 
 A lightweight macOS **menu bar** utility that locks your screen at configurable intervals to encourage regular breaks.
 
 ## Features
 
-- Menu bar controls: **Start/Resume**, **Pause**, **Skip Next Break**, **Settings**
-- Configurable:
+- **Menu bar controls**: Start/Resume, Pause, Skip Next Break, Settings, Quit
+- **Configurable** (via Settings window):
   - Break interval (minutes)
-  - Break duration (minutes)
+  - Break duration (minutes — advisory, shown in messages only)
   - Reminder time before lock (minutes)
-- Gentle reminder notification before locking (shown even when the app is focused)
-- Locks screen via `CGSession -suspend`; optional **turn off display** when locking (Settings)
+  - Turn off display when locking
+- Gentle **reminder notification** before each lock (shown even when the app is in the foreground)
+- Locks screen via `CGSession -suspend` with automatic fallback to `Cmd+Ctrl+Q` on newer macOS versions
+- Optional **display sleep** after locking
+- Timer precision aligned to **whole minutes** — starting at 7:44:37 counts from 7:44:00
+- Custom **app icon** (SF Symbol `lock.circle.fill`) shown in notifications
 
-## Run (Xcode)
+## Prerequisites
 
-**Use the App target** so the app runs as a proper `.app` bundle and notifications work:
+- macOS 13.0+
+- Xcode 15+
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) — install with `brew install xcodegen`
 
-1. Open **`BreakLockUtility.xcodeproj`** in Xcode (not the Swift Package).
-2. Select the **BreakLockUtility** scheme and press **Run** (⌘R).
+## Setup & Run
 
-If you open the repo as a Swift Package and run the executable target, you may see a `bundleProxyForCurrentProcess is nil` error; use the `.xcodeproj` to avoid that.
+The project uses **XcodeGen** to generate the `.xcodeproj` from `project.yml`.
 
-Notes:
-- The app sets its activation policy to **accessory** (and `LSUIElement` in Info.plist), so it won’t show a Dock icon.
-- The **menu bar icon** is the system SF Symbol **`lock.circle`**.
-- To configure **interval, break duration, and reminder**: click the menu bar icon → **Settings…** and adjust the values. Changes apply to the next scheduled interval (or Pause then Start/Resume to apply immediately).
-- On first run, macOS will ask for **Notifications** permission (needed for reminders).
+```bash
+# 1. Install XcodeGen (one-time)
+brew install xcodegen
 
-## Locking and unlocking
+# 2. Generate the Xcode project
+xcodegen generate
 
-**When a break starts**, the app:
+# 3. Open in Xcode
+open BreakLockUtility.xcodeproj
+```
 
-1. Shows a **notification** on the lock screen (or in Notification Center): *"Break started — Unlock anytime with your password. Suggested break: X minutes."* (X is your configured break duration.)
-2. Locks the session: `CGSession -suspend` (login screen).
-3. If **Turn off display when locking** is on in Settings: runs `pmset displaysleepnow` so the screen blanks.
+Then select the **BreakLockUtility** scheme and press **Run** (Cmd+R).
 
-**Unlocking:** You **unlock manually** by entering your Mac password. macOS does not allow apps to auto-unlock the screen. The app cannot lock the screen for a fixed time—you can unlock whenever you want.
+> **Important**: Always open `BreakLockUtility.xcodeproj`, **not** the folder. Opening the folder uses Swift Package Manager mode, which builds a bare executable without an `.app` bundle — notifications and other bundle-dependent features will silently fail.
 
-**Break duration** is not “locked for X minutes.” It means: after you unlock, the app will schedule the *next* lock to happen X minutes from when the break started. So if break duration is 2 minutes, the next lock is scheduled 2 minutes after the current lock (you can still unlock immediately and use the Mac; the next lock will occur after the next full work interval).
+### When to regenerate
 
-If macOS blocks locking (rare), ensure the app is allowed under **System Settings → Privacy & Security**.
+Run `xcodegen generate` only when you:
+- Add, remove, or rename `.swift` files
+- Change build settings in `project.yml`
 
-## Notifications
+Day-to-day code edits just need Cmd+R in Xcode.
 
-- Reminders (“Upcoming break”) are requested on first **Start/Resume** and show as banners/sounds.
-- They are shown even when the app is in the foreground (notification delegate presents them).
-- Run from **BreakLockUtility.xcodeproj** so the app has a valid bundle; otherwise notification APIs are skipped.
+## How it works
+
+### Menu bar
+
+- The app runs as a **menu-bar-only utility** (no Dock icon, no app switcher entry).
+- Click the **lock.circle** icon in the menu bar to access all controls.
+- **Settings...** opens a standalone window to configure intervals.
+
+### Timer
+
+1. Press **Start / Resume** to begin.
+2. The app schedules a lock at `now + break interval` (rounded to the current minute).
+3. A **reminder notification** fires before the lock (configurable lead time).
+4. At lock time, the screen locks immediately.
+5. After you **unlock manually** (password / Touch ID), the next interval starts automatically.
+
+### Locking and unlocking
+
+When a break starts, the app:
+
+1. Locks the session via `CGSession -suspend`. If that binary doesn't exist (macOS 14+), falls back to simulating **Cmd+Ctrl+Q** via AppleScript (requires one-time Accessibility permission).
+2. If **Turn off display when locking** is enabled: runs `pmset displaysleepnow`.
+
+**Unlocking** is always manual — macOS does not allow apps to auto-unlock the screen.
+
+**Break duration** is advisory only. It is used in messages to suggest how long to rest. You can unlock at any time.
+
+### Permissions
+
+- **Notifications**: macOS prompts on first launch. If denied, go to **System Settings > Notifications > Break Lock** and enable.
+- **Notifications show "Notification" instead of content?** Set **Show Previews > Always** in System Settings > Notifications (both the app-specific and system-wide setting).
+- **Accessibility** (only if CGSession fallback is used): macOS will prompt to allow the app to send keystrokes. Grant in **System Settings > Privacy & Security > Accessibility**.
+- **App Sandbox is disabled** so `Process()` calls (CGSession, pmset, osascript) work.
+
+## Distributing the app
+
+To share the app with someone without Xcode:
+
+```bash
+# 1. Archive in Xcode
+#    Product > Archive (or Cmd+Shift+B with Release config)
+
+# 2. Export from the Organizer
+#    Window > Organizer > select archive > Distribute App > Copy App
+
+# 3. The exported .app can be shared directly or wrapped in a DMG:
+hdiutil create -volname "Break Lock" -srcfolder /path/to/BreakLockUtility.app -ov BreakLock.dmg
+```
+
+Recipients may need to right-click > Open on first launch to bypass Gatekeeper (since the app is not notarized). For wider distribution, consider signing with a Developer ID and notarizing via `xcrun notarytool`.
+
+## Project structure
+
+```
+project.yml                    # XcodeGen spec (source of truth for .xcodeproj)
+Package.swift                  # SPM manifest (for compatibility, not primary build)
+BreakLockUtility/Info.plist    # App Info.plist
+Sources/BreakLockUtility/
+  BreakLockUtilityApp.swift    # @main App, menu bar scene, icon setup
+  BreakScheduler.swift         # Timer scheduling, lock triggering, unlock observation
+  LockScreen.swift             # Screen lock (CGSession + AppleScript fallback)
+  MenuContentView.swift        # Menu bar dropdown UI
+  AppSettingsView.swift        # Settings window + SettingsWindowController
+  Notifications.swift          # UNUserNotificationCenter wrapper
+  SettingsStore.swift          # @AppStorage-backed preferences
+```
 
